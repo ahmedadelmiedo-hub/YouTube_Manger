@@ -1,0 +1,21 @@
+# Local/runtime files
+.env
+.env.*
+!.env.example
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/storage/
+**/logs/
+**/config.toml
+**/config.toml.bak
+**/models/
+**/.streamlit/
+
+# Optional assets kept outside Git to keep clones lightweight
+apps/money-printer-turbo/resource/songs/
+apps/money-printer-turbo/resource/fonts/STHeitiLight.ttc
+apps/money-printer-turbo/resource/fonts/MicrosoftYaHeiNormal.ttc
+apps/money-printer-turbo/resource/fonts/MicrosoftYaHeiBold.ttc
