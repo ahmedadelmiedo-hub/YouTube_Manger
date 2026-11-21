@@ -1,0 +1,49 @@
+name: Scheduled Video Publish
+
+on:
+  schedule:
+    # GitHub Actions uses UTC. Runs at 00:00, 06:00, 12:00, and 18:00 UTC.
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      run_now:
+        description: 'تشغيل دورة النشر الآن بعد تفعيل VIDEO_AUTOMATION_ENABLED'
+        required: true
+        default: false
+        type: boolean
+
+# Never allow two video generations/uploads to run together.
+concurrency:
+  group: scheduled-video-publish
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    # Disabled by default until the real generator/uploader is configured.
+    # A skipped job consumes no runner minutes.
+    if: ${{ vars.VIDEO_AUTOMATION_ENABLED == 'true' && hashFiles('scripts/video_publish.py') != '' && (github.event_name == 'schedule' || inputs.run_now == true) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      MPT_ROOT: apps/money-printer-turbo
+      # Keep the first production rollout on the free Edge TTS path.
+      TTS_BACKEND: edge
+      VIDEO_AUTOMATION_ENABLED: ${{ vars.VIDEO_AUTOMATION_ENABLED }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate publish entrypoint
+        run: |
+          test -f "$MPT_ROOT/cli.py"
+          test -f scripts/video_publish.py
+          echo "Scheduled publisher entrypoint found."
+
+      # The publisher script owns dependency installation, generation, approval,
+      # and YouTube upload. Keeping this boundary explicit prevents the schedule
+      # from running MoneyPrinterTurbo without a valid upload path.
+      - name: Generate and publish one video
+        run: python scripts/video_publish.py
