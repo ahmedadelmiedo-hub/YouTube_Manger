@@ -18,6 +18,8 @@ def load_json(p, default):
 def next_topic():
     t = load_json(TOPICS_FILE, {"queue": []})
     done = {h.get("id") for h in load_json(HISTORY_FILE, [])}
+    if os.getenv("TOPIC_INDEX"):
+        return t["queue"][int(os.getenv("TOPIC_INDEX"))], t.get("playlists", [])
     for q in t["queue"]:
         if q["id"] not in done and q.get("status") != "needs-topic":
             return q, t.get("playlists", [])
