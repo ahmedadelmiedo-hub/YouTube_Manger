@@ -10,7 +10,7 @@ INK = (28, 24, 22); PAPER = (232, 220, 192); RED = (176, 32, 38); GOLD = (222, 1
 
 
 def _ar(s):
-    return get_display(arabic_reshaper.reshape(s))
+    return get_display(arabic_reshaper.reshape(km.safe_text(s)))
 
 
 def _font(size):
