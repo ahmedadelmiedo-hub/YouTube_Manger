@@ -40,6 +40,44 @@ def _call(model, prompt, key):
     return r.json()["candidates"][0]["content"]["parts"][0]["text"]
 
 
+def _grounded(model, prompt, key):
+    """Plain call with Google Search grounding (JSON is parsed from text)."""
+    r = requests.post(f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent", params={"key": key}, timeout=180,
+                      json={"contents": [{"parts": [{"text": prompt}]}], "tools": [{"google_search": {}}], "generationConfig": {"temperature": 0.1}})
+    r.raise_for_status()
+    t = "".join(p.get("text", "") for p in r.json()["candidates"][0]["content"]["parts"])
+    return json.loads(re.search(r"\{.*\}", t, re.S).group(0))
+
+
+def fact_check(data, key):
+    """Second pass: audit every scene against web sources. Drops unverified scenes, refuses disputed or open cases."""
+    lines = "\n".join(f"{i}: {s['narration']}" for i, s in enumerate(data["scenes"]))
+    q = f"""أنت مدقق حقائق صارم. القضية: {data['_topic']['title']}. تحقق من كل جملة أدناه عبر البحث على الويب. أعد JSON فقط بالمفاتيح:
+case_really_closed (true/false: هل القضية مغلقة فعلا أم ما زالت مفتوحة أو مسروقات لم تُسترد)، key_facts_disputed (true/false: هل التواريخ أو الوقائع الأساسية متضاربة بين المصادر)، verdicts (قائمة عناصر {{i, ok, issue}} لكل مشهد؛ ok=false إذا كانت المعلومة غير مدعومة أو خاطئة أو مبالغ فيها)، notes (سطر واحد).
+المشاهد:
+{lines}"""
+    last = None
+    for model in ("gemini-2.5-flash", "gemini-flash-latest"):
+        for t in range(2):
+            try:
+                v = _grounded(model, q, key)
+                bad = {x["i"] for x in v.get("verdicts", []) if not x.get("ok", True)}
+                data["fact_check"] = v
+                if v.get("case_really_closed") is False or v.get("key_facts_disputed") is True:
+                    raise RuntimeError(f"fact-check refused case: {v.get('notes')}")
+                if len(bad) > 2:
+                    raise RuntimeError(f"fact-check: {len(bad)} scenes unsupported: {v.get('notes')}")
+                if bad:
+                    data["scenes"] = [s for i, s in enumerate(data["scenes"]) if i not in bad]
+                    print("fact-check dropped scenes:", sorted(bad))
+                return data
+            except RuntimeError:
+                raise
+            except Exception as e:
+                last = e; print(f"[factcheck:{model}] {e}"); time.sleep(6)
+    raise RuntimeError(f"fact-check could not run: {last}")
+
+
 def generate_case():
     key = os.environ["GEMINI_API_KEY"]
     topic, playlists = next_topic()
@@ -47,7 +85,7 @@ def generate_case():
 القواعد الصارمة: اعتمد فقط على وقائع منشورة علنيا وموثقة في مصادر موثوقة (أحكام قضائية، صحافة معروفة، وثائق رسمية). لا تخترع تفاصيل. إذا لم تكن متأكدا من معلومة فاحذفها أو قل "بحسب التقارير". لا تسمّ أي شخص لم تثبت إدانته بحكم نهائي، ويمكن ذكر المدانين بحكم نهائي والضحايا المعروفين علنا باحترام، بدون وصف مروّع. لا عنف تفصيلي ولا ألفاظ جارحة.
 البنية: مشهد 1 هوك قوي في أول 3 ثوان (سؤال أو مفارقة)، ثم ما حدث، ثم اللغز أو العقبة، ثم كيف انكشفت القضية أو اتحلت (الأدلة/التكنولوجيا)، ثم الحكم أو النتيجة، ثم خاتمة قصيرة بسؤال يشجع على التعليق.
 8 إلى 10 مشاهد، كل مشهد من 12 إلى 24 كلمة. لكل مشهد: narration، on_screen (نص قصير أقل من 4 كلمات يظهر على الشاشة)، date_label (تاريخ أو سنة إن وجدت وإلا فارغ)، kind (واحد من: {KINDS})، 
-رجّع JSON فقط بالمفاتيح: title (عنوان جذاب بدون تضليل)، description (3 أسطر)، tags (8 كلمات)، hook_title (2 إلى 5 كلمات)، thumbnail_text (2 إلى 4 كلمات)، sources (قائمة 2 إلى 4 مصادر عامة بالاسم)، scenes."""
+رجّع JSON فقط بالمفاتيح: title (عنوان جذاب بدون تضليل)، description (3 أسطر)، tags (8 كلمات)، hook_title (2 إلى 5 كلمات)، thumbnail_text (2 إلى 4 كلمات)، sources (قائمة 2 إلى 4 مصادر محددة: اسم الجريدة أو الكتاب أو الحكم مع المؤلف أو التاريخ، وليس مجرد اسم عام)، case_closed (true فقط إذا كانت القضية انتهت بحكم نهائي أو استرداد مؤكد، وfalse إذا كانت القضية ما زالت مفتوحة أو الوقائع الأساسية مختلف عليها)، scenes."""
     last = None
     for model in MODELS:
         for t in range(4):
@@ -63,7 +101,11 @@ def generate_case():
                     if s.get("kind") not in KINDS.replace(" ", "").split(","):
                         s["kind"] = "folder"
                 data["scenes"] = scenes; data["_topic"] = topic; data["_playlists"] = playlists
-                return data
+                if data.get("case_closed") is False:
+                    raise RuntimeError("case is not closed, refusing")
+                return fact_check(data, key)
+            except RuntimeError:
+                raise
             except Exception as e:
                 last = e; print(f"[gemini:{model}] {e}"); time.sleep(8 * (t + 1))
     raise RuntimeError(f"case generation failed: {last}")
