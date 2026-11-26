@@ -5,8 +5,8 @@ on:
     branches: [file71-engine]
     paths: ["f71/**", ".github/workflows/file71-publish.yml"]
   schedule:
-    # Once a day, 22:30 UTC = 00:30 Cairo (YouTube daily upload cap)
-    - cron: "30 22 * * *"
+    # Once a day, 18:00 UTC = 20:00 Cairo in winter (21:00 in Egypt summer time)
+    - cron: "0 18 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -55,12 +55,21 @@ jobs:
         env:
           TOPIC_INDEX: ${{ matrix.idx }}
           DRY_RUN: ${{ github.event_name == 'push' && 'true' || github.event.inputs.dry_run || 'false' }}
-          PRIVACY_STATUS: ${{ github.event.inputs.privacy || vars.PRIVACY_STATUS || 'unlisted' }}
+          PRIVACY_STATUS: ${{ github.event.inputs.privacy || vars.PRIVACY_STATUS || 'public' }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
           YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
           YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
-        run: python scripts/video_publish.py
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "schedule" ] && [ "$(date -u +%F)" \< "2026-11-27" ]; then echo "Three videos already went out today; first scheduled upload is tomorrow."; exit 0; fi
+          python scripts/video_publish.py
+      - name: Save topic history
+        if: ${{ github.event_name == 'schedule' }}
+        run: |
+          git config user.name "file71-bot"
+          git config user.email "file71-bot@users.noreply.github.com"
+          git add history.json
+          git diff --cached --quiet || (git commit -m "file71: update history" && git pull --rebase && git push)
       - name: Upload preview files
         if: always()
         uses: actions/upload-artifact@v4
