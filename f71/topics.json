@@ -1,0 +1,69 @@
+{
+ "playlists": [
+  "قضايا مصرية كلاسيكية",
+  "قضايا عالمية حلتها التكنولوجيا",
+  "قضايا باردة اتحلت بعد سنين"
+ ],
+ "queue": [
+  {
+   "id": "raya-sakina",
+   "playlist": 0,
+   "title": "ريا وسكينة",
+   "status": "pending",
+   "sources": []
+  },
+  {
+   "id": "golden-state-killer",
+   "playlist": 1,
+   "title": "قاتل جولدن ستيت",
+   "status": "pending",
+   "sources": []
+  },
+  {
+   "id": "azzam-azzam",
+   "playlist": 0,
+   "title": "قضية عزام عزام: الاعتقال في مصر عام 1996 بتهمة التجسس والحكم عليه والإفراج عنه عام 2004",
+   "status": "pending",
+   "sources": []
+  },
+  {
+   "id": "madoff",
+   "playlist": 1,
+   "title": "قضية برني مادوف: أكبر مخطط احتيال هرمي في التاريخ، القبض عليه عام 2008 والحكم عليه بالسجن 150 عاماً عام 2009",
+   "status": "pending",
+   "sources": []
+  },
+  {
+   "id": "great-train-robbery",
+   "playlist": 2,
+   "title": "سطو قطار البريد الكبير في بريطانيا عام 1963 والقبض على أفراد العصابة والأحكام الصادرة عليهم",
+   "status": "pending",
+   "sources": []
+  },
+  {
+   "id": "unabomber",
+   "playlist": 2,
+   "title": "قضية تيد كازينسكي (Unabomber): القبض عليه عام 1996 والحكم عليه بالسجن المؤبد عام 1998",
+   "status": "pending",
+   "sources": []
+  },
+  {
+   "id": "hatton-garden",
+   "playlist": 1,
+   "title": "سرقة هاتون غاردن في لندن عام 2015: القبض على العصابة والأحكام الصادرة عليهم",
+   "status": "pending",
+   "sources": []
+  }
+ ],
+ "rules": {
+  "length_seconds": [
+   60,
+   90
+  ],
+  "hook_seconds": 3,
+  "never_name_unconvicted_people": true,
+  "require_public_sources": true,
+  "no_real_photos_of_people": true,
+  "one_real_upload_per_day": true
+ }
+}

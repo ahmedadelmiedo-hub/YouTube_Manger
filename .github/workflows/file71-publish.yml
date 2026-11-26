@@ -1,0 +1,80 @@
+name: File71 Publish
+
+on:
+  push:
+    branches: [file71-engine]
+    paths: ["f71/**", ".github/workflows/file71-publish.yml"]
+  schedule:
+    # Once a day, 18:00 UTC = 20:00 Cairo in winter (21:00 in Egypt summer time)
+    - cron: "0 18 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build the video without uploading"
+        type: boolean
+        default: true
+      privacy:
+        description: "unlisted / private / public"
+        default: "unlisted"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: file71-publish-b
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    # Scheduled/real runs stay off until repo variable FILE71_ENABLED is "true"; push and manual dry runs always allowed (dry only)
+    if: ${{ vars.FILE71_ENABLED == 'true' || github.event_name == 'push' || github.event.inputs.dry_run == 'true' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        idx: ${{ github.event_name == 'push' && fromJSON('["0","1","2"]') || fromJSON('[""]') }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: f71
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: f71/requirements.txt
+      - name: Check publisher exists
+        run: test -f scripts/video_publish.py
+      - name: Install system deps
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Install python deps
+        run: pip install -r requirements.txt
+      - name: Build and publish one video
+        env:
+          TOPIC_INDEX: ${{ matrix.idx }}
+          DRY_RUN: ${{ github.event_name == 'push' && 'true' || github.event.inputs.dry_run || 'false' }}
+          PRIVACY_STATUS: ${{ github.event.inputs.privacy || vars.PRIVACY_STATUS || 'public' }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "schedule" ] && [ "$(date -u +%F)" \< "2026-11-27" ]; then echo "Three videos already went out today; first scheduled upload is tomorrow."; exit 0; fi
+          python scripts/video_publish.py
+      - name: Save topic history
+        if: ${{ github.event_name == 'schedule' }}
+        run: |
+          git config user.name "file71-bot"
+          git config user.email "file71-bot@users.noreply.github.com"
+          git add history.json
+          git diff --cached --quiet || (git commit -m "file71: update history" && git pull --rebase && git push)
+      - name: Upload preview files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: file71-preview-${{ matrix.idx || 'run' }}
+          path: f71/preview/
+          retention-days: 3
+          if-no-files-found: ignore

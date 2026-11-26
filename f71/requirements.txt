@@ -1,0 +1,11 @@
+requests
+edge-tts
+Pillow<10
+numpy<2
+arabic-reshaper
+python-bidi
+google-api-python-client
+google-auth
+google-auth-oauthlib
+rembg
+onnxruntime
