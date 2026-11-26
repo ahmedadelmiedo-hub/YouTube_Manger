@@ -72,6 +72,23 @@ def upload(yt, path, title, desc, tags):
     return resp["id"]
 
 
+def brand_thumbnail(path):
+    """Fixed channel branding on every thumbnail: top-left stamp plate and a red strip along the bottom edge."""
+    from PIL import Image, ImageDraw
+    im = Image.open(path).convert("RGB"); w, h = im.size
+    d = ImageDraw.Draw(im)
+    pw, ph = int(w * 0.26), int(h * 0.15)
+    x0, y0 = int(w * 0.02), int(h * 0.03)
+    d.rounded_rectangle((x0, y0, x0 + pw, y0 + ph), radius=14, fill=(14, 20, 34), outline=(176, 32, 38), width=5)
+    d.rounded_rectangle((x0 + 8, y0 + 8, x0 + pw - 8, y0 + ph - 8), radius=10, outline=(176, 32, 38), width=2)
+    f = cv._font(int(ph * 0.5)); t = cv._ar("الملف 71")
+    bb = d.textbbox((0, 0), t, font=f)
+    d.text((x0 + (pw - (bb[2] - bb[0])) / 2 - bb[0], y0 + (ph - (bb[3] - bb[1])) / 2 - bb[1]), t, font=f, fill=(190, 40, 46))
+    d.rectangle((0, h - int(h * 0.025), w, h), fill=(176, 32, 38))
+    im.save(path, quality=92)
+    return path
+
+
 def main():
     d = cg.generate_case(); scenes = d["scenes"]; title = d["title"]
     print("Case:", title, "| scenes:", len(scenes))
@@ -79,6 +96,7 @@ def main():
     imgs = [cv.case_scene(i, s.get("on_screen"), s.get("kind"), s.get("date_label"), f"{OUT}/scene_{i:02d}.jpg") for i, s in enumerate(scenes)]
     base = cv.case_scene(0, d.get("thumbnail_text") or title, "folder", "", f"{OUT}/thumb_base.jpg", big=True)
     thumb = km.make_thumbnail(base, d.get("thumbnail_text") or title, f"{OUT}/thumb.jpg")
+    thumb = brand_thumbnail(thumb)
     dur = km.assemble(imgs, audios, f"{OUT}/case.mp4", (1280, 720), workdir=OUT, animate=True, title=d.get("hook_title") or title, captions=None)
     print("video seconds:", round(dur))
     os.makedirs("preview", exist_ok=True); shutil.copy(thumb, "preview/thumb.jpg")
