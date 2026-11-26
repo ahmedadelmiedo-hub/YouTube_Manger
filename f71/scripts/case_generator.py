@@ -53,7 +53,7 @@ def fact_check(data, key):
     """Second pass: audit every scene against web sources. Drops unverified scenes, refuses disputed or open cases."""
     lines = "\n".join(f"{i}: {s['narration']}" for i, s in enumerate(data["scenes"]))
     q = f"""أنت مدقق حقائق صارم. القضية: {data['_topic']['title']}. تحقق من كل جملة أدناه عبر البحث على الويب. أعد JSON فقط بالمفاتيح:
-case_really_closed (true/false: هل القضية مغلقة فعلا أم ما زالت مفتوحة أو مسروقات لم تُسترد)، key_facts_disputed (true/false: هل التواريخ أو الوقائع الأساسية متضاربة بين المصادر)، verdicts (قائمة عناصر {{i, ok, issue}} لكل مشهد؛ ok=false إذا كانت المعلومة غير مدعومة أو خاطئة أو مبالغ فيها)، notes (سطر واحد).
+sources_verifiable (true/false: هل المصادر التالية موجودة فعلا ويمكن التحقق منها: {data.get("sources")}), case_really_closed (true/false: هل القضية مغلقة فعلا أم ما زالت مفتوحة أو مسروقات لم تُسترد)، key_facts_disputed (true/false: هل التواريخ أو الوقائع الأساسية متضاربة بين المصادر)، verdicts (قائمة عناصر {{i, ok, issue}} لكل مشهد؛ ok=false إذا كانت المعلومة غير مدعومة أو خاطئة أو مبالغ فيها)، notes (سطر واحد).
 المشاهد:
 {lines}"""
     last = None
@@ -63,6 +63,8 @@ case_really_closed (true/false: هل القضية مغلقة فعلا أم ما 
                 v = _grounded(model, q, key)
                 bad = {x["i"] for x in v.get("verdicts", []) if not x.get("ok", True)}
                 data["fact_check"] = v
+                if v.get("sources_verifiable") is False:
+                    raise RuntimeError(f"fact-check: sources not verifiable: {v.get('notes')}")
                 if v.get("case_really_closed") is False or v.get("key_facts_disputed") is True:
                     raise RuntimeError(f"fact-check refused case: {v.get('notes')}")
                 if len(bad) > 2:
@@ -83,6 +85,7 @@ def generate_case():
     topic, playlists = next_topic()
     prompt = f"""اكتب سكريبت فيديو قصير (60 إلى 90 ثانية) بالعربية الفصحى المبسطة عن قضية جنائية مغلقة وموثقة: {topic['title']}.
 القواعد الصارمة: اعتمد فقط على وقائع منشورة علنيا وموثقة في مصادر موثوقة (أحكام قضائية، صحافة معروفة، وثائق رسمية). لا تخترع تفاصيل. إذا لم تكن متأكدا من معلومة فاحذفها أو قل "بحسب التقارير". لا تسمّ أي شخص لم تثبت إدانته بحكم نهائي، ويمكن ذكر المدانين بحكم نهائي والضحايا المعروفين علنا باحترام، بدون وصف مروّع. لا عنف تفصيلي ولا ألفاظ جارحة.
+إلزامي: يجب أن يحتوي السكريبت على 3 تفاصيل محددة على الأقل (تواريخ أو سنوات أو أرقام أو أسماء مدانين بحكم نهائي)، ولا تكتب كلاما عاما. اذكر فقط مصادر حقيقية تتأكد من وجودها (حكم قضائي، جريدة، كتاب موجود فعلا)، وإذا لم تكن متأكدا من مصدر فلا تذكره.
 البنية: مشهد 1 هوك قوي في أول 3 ثوان (سؤال أو مفارقة)، ثم ما حدث، ثم اللغز أو العقبة، ثم كيف انكشفت القضية أو اتحلت (الأدلة/التكنولوجيا)، ثم الحكم أو النتيجة، ثم خاتمة قصيرة بسؤال يشجع على التعليق.
 8 إلى 10 مشاهد، كل مشهد من 12 إلى 24 كلمة. لكل مشهد: narration، on_screen (نص قصير أقل من 4 كلمات يظهر على الشاشة)، date_label (تاريخ أو سنة إن وجدت وإلا فارغ)، kind (واحد من: {KINDS})، 
 رجّع JSON فقط بالمفاتيح: title (عنوان جذاب بدون تضليل)، description (3 أسطر)، tags (8 كلمات)، hook_title (2 إلى 5 كلمات)، thumbnail_text (2 إلى 4 كلمات)، sources (قائمة 2 إلى 4 مصادر محددة: اسم الجريدة أو الكتاب أو الحكم مع المؤلف أو التاريخ، وليس مجرد اسم عام)، case_closed (true فقط إذا كانت القضية انتهت بحكم نهائي أو استرداد مؤكد، وfalse إذا كانت القضية ما زالت مفتوحة أو الوقائع الأساسية مختلف عليها)، scenes."""
@@ -101,6 +104,9 @@ def generate_case():
                     if s.get("kind") not in KINDS.replace(" ", "").split(","):
                         s["kind"] = "folder"
                 data["scenes"] = scenes; data["_topic"] = topic; data["_playlists"] = playlists
+                nums = sum(len(re.findall(r"\d+", (s.get("narration", "") + " " + (s.get("date_label") or "")))) for s in scenes)
+                if nums < 3:
+                    raise ValueError(f"too generic: only {nums} concrete numbers/dates")
                 if data.get("case_closed") is False:
                     raise RuntimeError("case is not closed, refusing")
                 return fact_check(data, key)
