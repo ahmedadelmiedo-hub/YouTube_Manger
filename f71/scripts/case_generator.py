@@ -58,7 +58,7 @@ case_really_closed (true/false: هل القضية مغلقة فعلا أم ما 
 {lines}"""
     last = None
     for model in ("gemini-2.5-flash", "gemini-flash-latest"):
-        for t in range(2):
+        for t in range(3):
             try:
                 v = _grounded(model, q, key)
                 bad = {x["i"] for x in v.get("verdicts", []) if not x.get("ok", True)}
@@ -74,7 +74,7 @@ case_really_closed (true/false: هل القضية مغلقة فعلا أم ما 
             except RuntimeError:
                 raise
             except Exception as e:
-                last = e; print(f"[factcheck:{model}] {e}"); time.sleep(6)
+                last = e; print(f"[factcheck:{model}] {e}"); time.sleep(45 * (t + 1))
     raise RuntimeError(f"fact-check could not run: {last}")
 
 
