@@ -39,6 +39,7 @@ async def tts_all(scenes):
     paths = []
     for i, s in enumerate(scenes):
         p = f"{OUT}/voice_{i:02d}.mp3"
+        if os.path.exists(p) and os.path.getsize(p) > 1000: paths.append(p); continue
         for a in range(3):
             try:
                 await edge_tts.Communicate(s["narration"], VOICE, rate=RATE).save(p); break
@@ -94,7 +95,7 @@ def main():
     print("Case:", title, "| scenes:", len(scenes))
     audios = asyncio.run(tts_all(scenes))
     imgs = [cv.case_scene(i, s.get("on_screen"), s.get("kind"), s.get("date_label"), f"{OUT}/scene_{i:02d}.jpg") for i, s in enumerate(scenes)]
-    base = cv.case_scene(0, d.get("thumbnail_text") or title, "folder", "", f"{OUT}/thumb_base.jpg", big=True)
+    base = cv.case_scene(0, "", "folder", "", f"{OUT}/thumb_base.jpg", big=True)
     thumb = km.make_thumbnail(base, d.get("thumbnail_text") or title, f"{OUT}/thumb.jpg")
     thumb = brand_thumbnail(thumb)
     dur = km.assemble(imgs, audios, f"{OUT}/case.mp4", (1280, 720), workdir=OUT, animate=True, title=d.get("hook_title") or title, captions=None)
