@@ -21,7 +21,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: file71-publish
+  group: file71-publish-b
   cancel-in-progress: false
 
 jobs:
