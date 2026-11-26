@@ -84,7 +84,7 @@ def main():
     os.makedirs("preview", exist_ok=True); shutil.copy(thumb, "preview/thumb.jpg")
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", f"{OUT}/case.mp4", "-vf", "fps=1/8,scale=320:-1,tile=4x3", "-frames:v", "1", "preview/contact.jpg"], check=True)
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", f"{OUT}/case.mp4", "-vf", "scale=640:-2", "-c:v", "libx264", "-crf", "30", "-c:a", "aac", "-b:a", "64k", "preview/case_small.mp4"], check=True)
-    json.dump({k: d[k] for k in ("title", "description", "tags", "sources", "scenes")}, open("preview/script.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    json.dump({k: d[k] for k in ("title", "description", "tags", "sources", "scenes", "fact_check")}, open("preview/script.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     if DRY_RUN:
         print("DRY_RUN: skipping upload; topic not used up"); return
     yt = youtube()
