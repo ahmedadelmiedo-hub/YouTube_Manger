@@ -29,6 +29,10 @@ jobs:
     # Scheduled/real runs stay off until repo variable FILE71_ENABLED is "true"; push and manual dry runs always allowed (dry only)
     if: ${{ vars.FILE71_ENABLED == 'true' || github.event_name == 'push' || github.event.inputs.dry_run == 'true' }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        idx: ${{ github.event_name == 'push' && fromJSON('["0","1","2"]') || fromJSON('[""]') }}
     timeout-minutes: 45
     defaults:
       run:
@@ -48,6 +52,7 @@ jobs:
         run: pip install -r requirements.txt
       - name: Build and publish one video
         env:
+          TOPIC_INDEX: ${{ matrix.idx }}
           DRY_RUN: ${{ github.event_name == 'push' && 'true' || github.event.inputs.dry_run || 'false' }}
           PRIVACY_STATUS: ${{ github.event.inputs.privacy || vars.PRIVACY_STATUS || 'unlisted' }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -55,3 +60,11 @@ jobs:
           YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
           YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
         run: python scripts/video_publish.py
+      - name: Upload preview files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: file71-preview-${{ matrix.idx || 'run' }}
+          path: f71/preview/
+          retention-days: 3
+          if-no-files-found: ignore
