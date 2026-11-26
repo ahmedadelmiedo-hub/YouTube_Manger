@@ -1,0 +1,16 @@
+{
+  "playlists": ["قضايا مصرية كلاسيكية", "قضايا عالمية حلتها التكنولوجيا", "قضايا باردة اتحلت بعد سنين"],
+  "queue": [
+    {"id": "raya-sakina", "playlist": 0, "title": "ريا وسكينة", "status": "pending", "sources": []},
+    {"id": "golden-state-killer", "playlist": 1, "title": "قاتل جولدن ستيت", "status": "pending", "sources": []},
+    {"id": "egypt-case-3", "playlist": 0, "title": "TBD: well documented Egyptian case", "status": "needs-topic", "sources": []}
+  ],
+  "rules": {
+    "length_seconds": [60, 90],
+    "hook_seconds": 3,
+    "never_name_unconvicted_people": true,
+    "require_public_sources": true,
+    "no_real_photos_of_people": true,
+    "one_real_upload_per_day": true
+  }
+}
