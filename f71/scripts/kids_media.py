@@ -345,8 +345,27 @@ def assemble(scene_imgs, scene_audios, out, size, max_dur=None, workdir="out", a
     return total
 
 
+_DECADES = {"1900": "الأعوام 1900", "1950": "الخمسينيات", "1960": "الستينيات", "1970": "السبعينيات", "1980": "الثمانينيات", "1990": "التسعينيات", "2000": "الألفينات", "2010": "العشرينات"}
+_LATIN = {"DNA": "الحمض النووي", "FBI": "مكتب التحقيقات", "CIA": "المخابرات", "USA": "أمريكا", "UK": "بريطانيا", "TV": "التلفزيون"}
+
+
+def safe_text(s):
+    """The Arabic font has no Latin letters: swap known acronyms and decades for Arabic, then drop any char the font cannot draw (no empty boxes on screen)."""
+    s = s or ""
+    for k, v in _LATIN.items():
+        s = re.sub(r"\b" + k + r"\b", v, s)
+    s = re.sub(r"\b(\d{4})s\b", lambda m: _DECADES.get(m.group(1), m.group(1)), s)
+    try:
+        from fontTools.ttLib import TTFont
+        cm = TTFont(ensure_font()).getBestCmap()
+        s = "".join(c for c in s if ord(c) in cm or c in "\n")
+    except Exception:
+        s = re.sub(r"[A-Za-z]+", "", s)
+    return re.sub(r"\s{2,}", " ", s).strip()
+
+
 def _ar(s):
-    return get_display(arabic_reshaper.reshape(s))
+    return get_display(arabic_reshaper.reshape(safe_text(s)))
 
 
 def make_thumbnail(base_img_path, text, out):
@@ -367,7 +386,7 @@ def make_thumbnail(base_img_path, text, out):
             break
         size -= 6
     lh = int(size * 1.35)
-    y = H - 40 - lh * len(lines)
+    y = H - 78 - lh * len(lines)
     for l in lines:
         t = _ar(l)
         tw = d.textlength(t, font=f)
