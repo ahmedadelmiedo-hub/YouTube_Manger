@@ -15,9 +15,9 @@ def load_json(p, default):
         return default
 
 
-def next_topic():
+def next_topic(skip=()):
     t = load_json(TOPICS_FILE, {"queue": []})
-    done = {h.get("id") for h in load_json(HISTORY_FILE, [])}
+    done = {h.get("id") for h in load_json(HISTORY_FILE, [])} | set(skip)
     if os.getenv("TOPIC_INDEX"):
         return t["queue"][int(os.getenv("TOPIC_INDEX"))], t.get("playlists", [])
     for q in t["queue"]:
@@ -81,8 +81,26 @@ sources_verifiable (true/false: هل المصادر التالية موجودة 
 
 
 def generate_case():
+    """Try topics in queue order; a refused case (fact-check or not closed) is skipped, never uploaded, and the next topic is tried."""
+    skipped = []
+    for _ in range(6):
+        try:
+            return _generate_case(skipped)
+        except RuntimeError as e:
+            msg = str(e)
+            if os.getenv("TOPIC_INDEX") or not ((msg.startswith("fact-check:") or msg.startswith("fact-check refused")) and "could not run" not in msg or msg.startswith("case is not closed")) or not skipped_id_holder:
+                raise
+            print("SKIPPED topic", skipped_id_holder[-1], "->", msg[:200]); skipped.append(skipped_id_holder[-1])
+    raise RuntimeError("six topics in a row were refused")
+
+
+skipped_id_holder = []
+
+
+def _generate_case(skip):
     key = os.environ["GEMINI_API_KEY"]
-    topic, playlists = next_topic()
+    topic, playlists = next_topic(skip)
+    skipped_id_holder.append(topic["id"])
     prompt = f"""اكتب سكريبت فيديو قصير (60 إلى 90 ثانية) بالعربية الفصحى المبسطة عن قضية جنائية مغلقة وموثقة: {topic['title']}.
 القواعد الصارمة: اعتمد فقط على وقائع منشورة علنيا وموثقة في مصادر موثوقة (أحكام قضائية، صحافة معروفة، وثائق رسمية). لا تخترع تفاصيل. إذا لم تكن متأكدا من معلومة فاحذفها أو قل "بحسب التقارير". لا تسمّ أي شخص لم تثبت إدانته بحكم نهائي، ويمكن ذكر المدانين بحكم نهائي والضحايا المعروفين علنا باحترام، بدون وصف مروّع. لا عنف تفصيلي ولا ألفاظ جارحة.
 إلزامي: يجب أن يحتوي السكريبت على 3 تفاصيل محددة على الأقل (تواريخ أو سنوات أو أرقام أو أسماء مدانين بحكم نهائي)، ولا تكتب كلاما عاما. اذكر فقط مصادر حقيقية تتأكد من وجودها (حكم قضائي، جريدة، كتاب موجود فعلا)، وإذا لم تكن متأكدا من مصدر فلا تذكره.
